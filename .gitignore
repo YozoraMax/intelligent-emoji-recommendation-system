@@ -89,6 +89,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Keep template files
+!env.template
+
 # Spyder project settings
 .spyderproject
 .spyproject
