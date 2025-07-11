@@ -1,0 +1,16 @@
+faiss-cpu>=1.7.0
+sentence-transformers>=2.0.0
+numpy>=1.21.0
+scikit-learn>=1.0.0
+jieba>=0.42.0
+
+# API服务依赖
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+
+# 客户端测试依赖
+requests>=2.31.0
+
+# OSS依赖
+oss2>=2.18.0
