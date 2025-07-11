@@ -1,161 +1,129 @@
-# 基于阿里云OSS的智能表情包推荐系统
+# 基于OSS的智能表情包推荐系统
 
-基于阿里云OSS云存储的智能表情包推荐系统，通过JSON元数据实现高效的表情包匹配和推荐。
+一个基于阿里云OSS存储的智能表情包推荐系统，通过关键词匹配和情绪分析为用户推荐合适的表情包。
 
-## 🌟 项目特性
+## 🌟 功能特性
 
-### ✨ 核心优势
-- **☁️ 云端存储**: 基于阿里云OSS，支持海量表情包存储
-- **🚀 高性能**: JSON元数据查找，毫秒级响应
-- **🌍 全球加速**: 支持CDN加速，全球快速访问
-- **💰 成本优化**: 按需付费，存储成本低
-- **🔄 智能缓存**: 24小时自动缓存，减少OSS访问
-- **⚙️ 配置化**: 灵活的配置管理系统
-- **📈 易扩展**: 支持无限表情包扩展
+- **🔤 智能匹配**: 基于关键词和情绪分析的表情包推荐
+- **☁️ OSS集成**: 直接从阿里云OSS读取表情包资源
+- **🔐 安全认证**: 支持Basic Auth和ECS RAM Role认证
+- **⚡ 高性能**: 支持元数据缓存，减少OSS API调用
+- **🌐 RESTful API**: 提供完整的HTTP API接口
+- **📊 实时监控**: 提供状态监控和配置查看接口
+- **🔄 动态刷新**: 支持运行时刷新表情包元数据
 
-### 🎯 应用场景
-- 聊天机器人智能表情包推荐
-- 社交应用自动表情回复
-- 情绪分析和表达辅助
-- 基于云存储的表情包管理
-
-## 🏗️ 系统架构
+## 📁 项目结构
 
 ```
-用户输入 → API服务 → 关键词匹配 → JSON元数据查找 → OSS URL返回
-    ↓          ↓          ↓           ↓            ↓
-  文本分析    接口处理    算法计算     元数据缓存     云端文件
-```
-
-### 技术栈
-- **云存储**: 阿里云OSS对象存储
-- **API框架**: FastAPI (高性能异步框架)
-- **数据格式**: JSON元数据映射
-- **中文分词**: jieba分词
-- **缓存机制**: 本地文件缓存
-- **支持格式**: GIF/JPG/PNG/WebP
-
-## 📦 项目结构
-
-```
-情绪聊天/
-├── config.py                     # 配置文件（包含OSS配置）
-├── oss_metadata_builder.py       # OSS元数据构建器
-├── oss_emoji_recommender.py      # OSS版推荐算法
-├── oss_api_server.py             # OSS版API服务端
-├── oss_config_template.py        # OSS配置模板
-├── test_oss_config.py            # OSS配置测试脚本
-├── requirements.txt              # 依赖列表
-├── OSS部署指南.md                # 详细部署说明
-├── OSS集成总结.md                # 集成工作总结
-└── README.md                    # 项目说明文档
+intelligent-emoji-recommendation-system/
+├── config.py                  # 系统配置文件
+├── oss_api_server.py          # FastAPI服务器主程序
+├── oss_emoji_recommender.py   # 表情包推荐核心逻辑
+├── oss_metadata_builder.py    # OSS元数据构建器
+├── requirements.txt           # Python依赖包
+└── README.md                  # 项目说明文档
 ```
 
 ## 🚀 快速开始
 
-### 第一步：准备OSS环境
+### 1. 环境要求
 
-1. **创建阿里云OSS Bucket**
-   - 登录阿里云控制台创建Bucket
-   - 设置读权限为"公共读"
-   - 记录Bucket名称和地域信息
+- Python 3.8+
+- 阿里云OSS访问权限
 
-2. **上传表情包文件**
-   ```
-   assets/
-   ├── 好吃/
-   │   ├── emoji1.gif
-   │   └── emoji2.gif
-   ├── 开心 舒适/
-   │   └── emoji.gif
-   └── 其他分类/
-       └── ...
-   ```
-
-3. **获取AccessKey**
-   - 在阿里云RAM控制台创建用户
-   - 分配OSS权限
-   - 创建AccessKey
-
-### 第二步：配置系统
-
-1. **安装依赖**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **配置OSS信息**
-   ```python
-   # 在config.py中配置
-   class OSSConfig:
-       ACCESS_KEY_ID = 'YOUR_ACCESS_KEY_ID'
-       ACCESS_KEY_SECRET = 'YOUR_ACCESS_KEY_SECRET'
-       ENDPOINT = 'oss-cn-beijing.aliyuncs.com'
-       BUCKET_NAME = 'your-bucket-name'
-   ```
-
-3. **验证配置**
-   ```bash
-   python test_oss_config.py
-   ```
-
-### 第三步：构建元数据
+### 2. 安装依赖
 
 ```bash
-python oss_metadata_builder.py
+pip install -r requirements.txt
 ```
 
-该脚本会：
-- 🔍 扫描OSS Bucket中的表情包文件
-- 📊 按目录自动分类
-- 💾 生成JSON元数据文件 (`oss_emoji_metadata.json`)
-- ⚡ 创建24小时缓存
+### 3. 配置OSS
 
-### 第四步：启动API服务
+在 `config.py` 中配置OSS相关参数：
+
+```python
+class OSSConfig:
+    # OSS基本配置
+    ENDPOINT = 'oss-cn-beijing.aliyuncs.com'    # 您的OSS地域
+    BUCKET_NAME = 'your-bucket-name'            # 您的Bucket名称
+    EMOJI_ROOT_PATH = 'emoji/'                  # 表情包根目录
+    
+    # 认证配置（二选一）
+    # 方式1: ECS RAM Role认证（推荐）
+    USE_ECS_RAM_ROLE = True
+    
+    # 方式2: AKSK认证
+    # ACCESS_KEY_ID = 'your-access-key-id'
+    # ACCESS_KEY_SECRET = 'your-access-key-secret'
+```
+
+### 4. 环境变量配置（可选）
+
+创建 `.env` 文件：
+
+```bash
+# OSS认证（如果不使用ECS RAM Role）
+OSS_ACCESS_KEY_ID=your-access-key
+OSS_ACCESS_KEY_SECRET=your-secret-key
+OSS_USE_ECS_RAM_ROLE=false
+
+# API认证
+API_USERNAME=your-username
+API_PASSWORD=your-password
+```
+
+或者设置环境变量：
+
+```bash
+export OSS_ACCESS_KEY_ID="your-access-key"
+export OSS_ACCESS_KEY_SECRET="your-secret-key"
+export OSS_USE_ECS_RAM_ROLE="false"
+export API_USERNAME="your-username"
+export API_PASSWORD="your-password"
+```
+
+### 5. 运行服务
 
 ```bash
 python oss_api_server.py
 ```
 
-服务启动后可访问：
-- **API文档**: http://localhost:8000/docs
-- **健康检查**: http://localhost:8000/health
-- **服务状态**: http://localhost:8000/status
+服务将在 `http://localhost:8000` 启动。
 
-## 📡 API接口
+## 📖 API文档
 
-### 1. 表情包推荐
+### 基础信息
 
-⚠️ **认证要求**: 本API已启用Basic Auth认证，需要提供用户名和密码。
+- **服务地址**: `http://localhost:8000`
+- **API文档**: `http://localhost:8000/docs`
+- **认证方式**: Basic Auth（默认用户名: `emoji_user`，密码: `emoji_pass_2025`）
 
-```bash
-# POST请求（需要认证）
-curl -X POST -u "emoji_user:emoji_pass_2025" \
-     "http://localhost:8000/recommend" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "input": "今天心情特别好，很开心",
-       "top_k": 1
-     }'
+### 主要接口
 
-# GET请求（需要认证）
-curl -u "emoji_user:emoji_pass_2025" \
-     "http://localhost:8000/recommend?input=今天好开心&top_k=1"
-```
+#### 1. 表情包推荐
 
-### 2. 响应格式
+**POST** `/recommend`
+
 ```json
 {
-  "input": "今天心情特别好，很开心",
+  "input": "今天心情很好，特别开心",
+  "top_k": 1
+}
+```
+
+**GET** `/recommend?input=今天心情很好&top_k=1`
+
+**响应示例**:
+```json
+{
+  "input": "今天心情很好，特别开心",
   "output": [
     {
-      "url": "https://bucket.oss-cn-beijing.aliyuncs.com/assets/开心 舒适/emoji.gif",
-      "category": "开心 舒适",
-      "score": 1.0,
-      "keyword_score": 1.0,
+      "url": "https://bucket.oss-region.aliyuncs.com/emoji/开心/happy.gif",
+      "category": "开心",
+      "score": 0.95,
+      "keyword_score": 0.95,
       "semantic_score": 0.0,
-      "keyword_weight": 0.7,
-      "semantic_weight": 0.3,
       "rank": 1,
       "source": "oss"
     }
@@ -166,103 +134,350 @@ curl -u "emoji_user:emoji_pass_2025" \
     "semantic_weight": 0.3
   },
   "oss_info": {
-    "bucket": "your-bucket-name",
+    "bucket": "your-bucket",
     "endpoint": "oss-cn-beijing.aliyuncs.com",
     "using_oss": true
   }
 }
 ```
 
-### 3. 其他接口
-- **GET /status**: 服务状态和统计信息
-- **GET /config**: 获取当前配置
-- **POST /refresh**: 刷新元数据缓存
-- **GET /health**: 健康检查
+#### 2. 服务状态
+
+**GET** `/status`
+
+```json
+{
+  "status": "healthy",
+  "message": "OSS推荐服务运行正常",
+  "stats": {
+    "total_categories": 15,
+    "total_emoji_urls": 1250,
+    "metadata_loaded_at": "2025-01-27T10:30:00",
+    "using_oss": true
+  }
+}
+```
+
+#### 3. 配置信息
+
+**GET** `/config`
+
+```json
+{
+  "algorithm_config": {
+    "keyword_weight": 0.7,
+    "semantic_weight": 0.3
+  },
+  "recommend_config": {
+    "default_top_k": 1,
+    "max_top_k": 10,
+    "min_top_k": 1
+  },
+  "oss_config": {
+    "bucket": "your-bucket",
+    "endpoint": "oss-cn-beijing.aliyuncs.com",
+    "emoji_root_path": "emoji/",
+    "cache_file": "oss_emoji_metadata.json",
+    "cache_expire_hours": 24
+  }
+}
+```
+
+#### 4. 刷新元数据
+
+**POST** `/refresh`
+
+强制重新从OSS加载表情包元数据。
+
+#### 5. 健康检查
+
+**GET** `/health`
+
+系统健康状态检查，无需认证。
+
+### API使用示例
+
+#### Python请求示例
+
+```python
+import requests
+from base64 import b64encode
+
+# API基础信息
+base_url = "http://localhost:8000"
+username = "emoji_user"
+password = "emoji_pass_2025"
+
+# 构建Basic Auth头
+credentials = b64encode(f"{username}:{password}".encode()).decode()
+headers = {"Authorization": f"Basic {credentials}"}
+
+# 推荐表情包
+response = requests.post(
+    f"{base_url}/recommend",
+    headers=headers,
+    json={"input": "今天心情很好", "top_k": 2}
+)
+
+if response.status_code == 200:
+    result = response.json()
+    for emoji in result["output"]:
+        print(f"分类: {emoji['category']}")
+        print(f"URL: {emoji['url']}")
+        print(f"分数: {emoji['score']}")
+        print("---")
+else:
+    print(f"请求失败: {response.status_code}")
+```
+
+#### curl命令示例
+
+```bash
+# 推荐表情包 (POST)
+curl -X POST "http://localhost:8000/recommend" \
+  -H "Authorization: Basic ZW1vamlfdXNlcjplbW9qaV9wYXNzXzIwMjU=" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "今天心情很好", "top_k": 1}'
+
+# 推荐表情包 (GET)
+curl "http://localhost:8000/recommend?input=开心&top_k=1" \
+  -H "Authorization: Basic ZW1vamlfdXNlcjplbW9qaV9wYXNzXzIwMjU="
+
+# 查看服务状态
+curl "http://localhost:8000/status" \
+  -H "Authorization: Basic ZW1vamlfdXNlcjplbW9qaV9wYXNzXzIwMjU="
+
+# 健康检查（无需认证）
+curl "http://localhost:8000/health"
+```
+
+#### JavaScript/前端示例
+
+```javascript
+// 推荐表情包函数
+async function recommendEmoji(text, topK = 1) {
+    const username = 'emoji_user';
+    const password = 'emoji_pass_2025';
+    const credentials = btoa(`${username}:${password}`);
+    
+    try {
+        const response = await fetch('http://localhost:8000/recommend', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                input: text,
+                top_k: topK
+            })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.output;
+        } else {
+            console.error('推荐失败:', response.status);
+            return [];
+        }
+    } catch (error) {
+        console.error('请求错误:', error);
+        return [];
+    }
+}
+
+// 使用示例
+recommendEmoji('今天心情很好').then(emojis => {
+    emojis.forEach(emoji => {
+        console.log(`分类: ${emoji.category}, URL: ${emoji.url}`);
+    });
+});
+```
 
 ## 🔧 配置说明
 
-### OSS配置项
-```python
-class OSSConfig:
-    # 必填配置
-    ACCESS_KEY_ID = ''              # 阿里云AccessKey ID
-    ACCESS_KEY_SECRET = ''          # 阿里云AccessKey Secret
-    ENDPOINT = ''                   # OSS Endpoint
-    BUCKET_NAME = ''                # OSS Bucket名称
-    
-    # 可选配置
-    CUSTOM_DOMAIN = ''              # 自定义域名（CDN）
-    USE_HTTPS = True                # 是否使用HTTPS
-    EMOJI_ROOT_PATH = 'assets/'     # 表情包根路径
-    METADATA_CACHE_FILE = 'oss_emoji_metadata.json'
-    CACHE_EXPIRE_HOURS = 24         # 缓存过期时间
-```
-
 ### 算法配置
+
 ```python
 class AlgorithmConfig:
-    KEYWORD_WEIGHT = 0.7    # 关键词匹配权重70%
-    SEMANTIC_WEIGHT = 0.3   # 语义匹配权重30%
-
-class RecommendConfig:
-    DEFAULT_TOP_K = 1       # 默认推荐数量
-    MAX_TOP_K = 10          # 最大推荐数量
+    KEYWORD_WEIGHT = 0.7    # 关键词匹配权重 70%
+    SEMANTIC_WEIGHT = 0.3   # 语义匹配权重 30%
 ```
 
-## 🔧 环境配置
+### 情绪关键词
 
-### OSS认证配置
+系统预定义了9种情绪分类：
 
-#### 方式1: ECS RAM Role (推荐，更安全)
+- **开心**: 开心、高兴、快乐、兴奋等
+- **愤怒**: 愤怒、生气、恼火、暴躁等  
+- **悲伤**: 悲伤、难过、伤心、沮丧等
+- **撒娇**: 撒娇、可爱、萌、求等
+- **疲惫**: 累、疲惫、困、倦怠等
+- **好吃**: 吃、好吃、美食、蛋糕等
+- **害羞**: 害羞、脸红、不好意思等
+- **赞同**: 支持、赞同、同意、对等
+- **鼓励**: 安慰、鼓励、加油、没事等
 
-在ECS实例上部署时，推荐使用RAM角色进行认证，无需在代码中存储敏感信息：
+### OSS目录结构
+
+推荐的OSS目录结构：
+
+```
+your-bucket/
+└── emoji/                 # EMOJI_ROOT_PATH
+    ├── 开心/
+    │   ├── happy1.gif
+    │   └── happy2.png
+    ├── 愤怒/
+    │   ├── angry1.gif
+    │   └── angry2.jpg
+    └── 悲伤/
+        ├── sad1.gif
+        └── sad2.webp
+```
+
+## 🛠️ 独立组件使用
+
+### 1. 元数据构建器
 
 ```bash
-# 环境变量配置
-OSS_USE_ECS_RAM_ROLE=true
-OSS_ENDPOINT=oss-cn-beijing.aliyuncs.com
-OSS_BUCKET_NAME=your-bucket-name
-
-# API认证配置
-API_USERNAME=your_username
-API_PASSWORD=your_password
+python oss_metadata_builder.py
 ```
 
-**ECS RAM角色设置步骤：**
-1. 在RAM控制台创建服务角色（受信服务：ECS）
-2. 为角色添加OSS权限策略（AliyunOSSFullAccess或自定义）
-3. 在ECS控制台将角色绑定到实例
-4. 重启应用程序应用新权限
+手动构建OSS表情包元数据。
 
-#### 方式2: AccessKey (传统方式)
+### 2. 推荐器测试
 
 ```bash
-# 环境变量配置
-OSS_USE_ECS_RAM_ROLE=false
-OSS_ACCESS_KEY_ID=your_access_key_id
-OSS_ACCESS_KEY_SECRET=your_access_key_secret
-OSS_ENDPOINT=oss-cn-beijing.aliyuncs.com
-OSS_BUCKET_NAME=your-bucket-name
-
-# API认证配置  
-API_USERNAME=your_username
-API_PASSWORD=your_password
+python oss_emoji_recommender.py
 ```
 
-## 📚 详细文档
+测试表情包推荐功能。
 
-- [OSS部署指南](./OSS部署指南.md) - 完整的部署说明
-- [API认证使用说明](./API认证使用说明.md) - API认证详细说明
-- [OSS集成总结](./OSS集成总结.md) - 技术实现总结
+### 3. 配置验证
 
-## 🤝 贡献
+```bash
+python config.py
+```
 
-欢迎提交Issue和Pull Request来改进这个项目！
+验证和显示当前配置信息。
+
+## 📦 部署指南
+
+### Docker部署
+
+#### 方式1: 使用预配置的Dockerfile
+
+```bash
+# 构建镜像
+docker build -t emoji-recommender .
+
+# 运行容器
+docker run -p 8000:8000 \
+  -e OSS_ACCESS_KEY_ID="your-key" \
+  -e OSS_ACCESS_KEY_SECRET="your-secret" \
+  -e API_USERNAME="admin" \
+  -e API_PASSWORD="secure-password" \
+  emoji-recommender
+```
+
+#### 方式2: 使用docker-compose
+
+```bash
+# 复制环境变量文件
+cp .env.example .env
+# 编辑 .env 文件，填入你的配置
+
+# 启动服务
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+```
+
+### 生产环境部署
+
+推荐使用Gunicorn：
+
+```bash
+pip install gunicorn
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 oss_api_server:app
+```
+
+## 🔍 故障排除
+
+### 常见问题
+
+1. **OSS认证失败**
+   - 检查ACCESS_KEY_ID和ACCESS_KEY_SECRET
+   - 确认ECS实例已配置RAM角色（如使用RAM Role）
+   - 验证OSS访问权限
+
+2. **表情包加载失败**
+   - 检查BUCKET_NAME和ENDPOINT配置
+   - 确认EMOJI_ROOT_PATH路径正确
+   - 验证OSS中是否存在表情包文件
+
+3. **API认证失败**
+   - 检查API_USERNAME和API_PASSWORD
+   - 确认请求头包含正确的Basic Auth信息
+
+4. **性能问题**
+   - 增加缓存时间（CACHE_EXPIRE_HOURS）
+   - 使用CDN加速OSS访问
+   - 考虑本地缓存表情包URL
+
+### 日志查看
+
+服务运行时会输出详细日志，包括：
+
+- OSS连接状态
+- 元数据加载进度
+- 推荐请求处理
+- 错误信息和堆栈
+
+## 🤝 贡献指南
+
+欢迎提交Issue和Pull Request！
+
+1. Fork本项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交变更 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送分支 (`git push origin feature/AmazingFeature`)
+5. 开启Pull Request
 
 ## 📄 许可证
 
-MIT License
+本项目采用MIT许可证 - 详见 [LICENSE](LICENSE) 文件。
+
+## 🆕 版本更新
+
+### v2.0.0
+- ✨ 全面重构为基于OSS的架构
+- 🔐 新增Basic Auth认证支持
+- ⚡ 优化元数据缓存机制
+- 📊 增强API响应格式
+- 🛠️ 改进错误处理和日志记录
+
+### v1.x.x
+- 🎯 基础表情包推荐功能
+- 🔤 关键词匹配算法
+- 📁 本地文件系统支持
+
+## 📞 联系方式
+
+如有问题或建议，请通过以下方式联系：
+
+- 📧 Email: [your-email@example.com]
+- 🐛 Issues: [GitHub Issues页面]
+- 📖 文档: [项目Wiki页面]
 
 ---
 
-🌟 如果这个项目对您有帮助，请给它一个star！
+<div align="center">
+  <strong>基于OSS的智能表情包推荐系统</strong><br>
+  让表情包推荐更智能、更便捷！ 🎉
+</div> 

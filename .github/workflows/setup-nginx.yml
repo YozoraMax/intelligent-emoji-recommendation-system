@@ -1,0 +1,410 @@
+name: 配置Nginx和HTTPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: '域名 (必需)'
+        required: true
+        default: ''
+      email:
+        description: 'SSL证书邮箱 (必需)'
+        required: true
+        default: ''
+      enable_https:
+        description: '启用HTTPS'
+        required: false
+        default: true
+        type: boolean
+      backend_port:
+        description: '后端服务端口'
+        required: false
+        default: '8000'
+
+env:
+  PROJECT_NAME: 'channel-integration'
+
+jobs:
+  setup-nginx:
+    name: 配置Nginx和HTTPS
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+    
+    - name: 配置Nginx和HTTPS
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.PORT || 22 }}
+        script: |
+          set -e
+          
+          # 设置变量
+          DOMAIN="${{ github.event.inputs.domain }}"
+          EMAIL="${{ github.event.inputs.email }}"
+          ENABLE_HTTPS="${{ github.event.inputs.enable_https }}"
+          BACKEND_PORT="${{ github.event.inputs.backend_port }}"
+          SERVICE_NAME="${{ env.PROJECT_NAME }}"
+          
+          echo "🌐 开始配置Nginx和HTTPS..."
+          echo "域名: $DOMAIN"
+          echo "邮箱: $EMAIL"
+          echo "启用HTTPS: $ENABLE_HTTPS"
+          echo "后端端口: $BACKEND_PORT"
+          
+          # 验证输入参数
+          if [ -z "$DOMAIN" ]; then
+              echo "❌ 错误: 域名不能为空"
+              exit 1
+          fi
+          
+          if [ "$ENABLE_HTTPS" = "true" ] && [ -z "$EMAIL" ]; then
+              echo "❌ 错误: 启用HTTPS时邮箱不能为空"
+              exit 1
+          fi
+          
+          # 更新系统包
+          echo "📦 更新系统包..."
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt update -qq
+          
+          # 安装Nginx和SSL相关工具
+          echo "🔧 安装Nginx和SSL工具..."
+          sudo apt install -y -qq nginx
+          
+          if [ "$ENABLE_HTTPS" = "true" ]; then
+              sudo apt install -y -qq certbot python3-certbot-nginx dnsutils curl
+          fi
+          
+          # 配置防火墙
+          echo "🔥 配置防火墙规则..."
+          if command -v ufw >/dev/null 2>&1; then
+              sudo ufw allow 22/tcp
+              sudo ufw allow 80/tcp
+              if [ "$ENABLE_HTTPS" = "true" ]; then
+                  sudo ufw allow 443/tcp
+              fi
+              # 启用防火墙（如果尚未启用）
+              sudo ufw --force enable 2>/dev/null || true
+              echo "✅ UFW防火墙规则已配置"
+          elif command -v firewalld >/dev/null 2>&1; then
+              sudo firewall-cmd --permanent --add-service=ssh
+              sudo firewall-cmd --permanent --add-service=http
+              if [ "$ENABLE_HTTPS" = "true" ]; then
+                  sudo firewall-cmd --permanent --add-service=https
+              fi
+              sudo firewall-cmd --reload
+              echo "✅ Firewalld规则已配置"
+          else
+              echo "⚠️ 未检测到防火墙，请手动配置"
+          fi
+          
+          # 备份现有Nginx配置
+          if [ -f "/etc/nginx/sites-available/$DOMAIN" ]; then
+              echo "📂 备份现有Nginx配置..."
+              sudo cp "/etc/nginx/sites-available/$DOMAIN" "/etc/nginx/sites-available/$DOMAIN.backup-$(date +%Y%m%d-%H%M%S)"
+          fi
+          
+          # 创建Nginx配置
+          echo "📝 创建Nginx配置..."
+          sudo tee /etc/nginx/sites-available/$DOMAIN > /dev/null <<EOF
+          server {
+              listen 80;
+              server_name $DOMAIN;
+              
+              # 安全头设置
+              add_header X-Frame-Options DENY;
+              add_header X-Content-Type-Options nosniff;
+              add_header X-XSS-Protection "1; mode=block";
+              add_header Referrer-Policy "strict-origin-when-cross-origin";
+              
+              # API路由
+              location / {
+                  proxy_pass http://127.0.0.1:$BACKEND_PORT;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  
+                  # WebSocket支持
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  
+                  # 超时设置
+                  proxy_connect_timeout 60s;
+                  proxy_send_timeout 60s;
+                  proxy_read_timeout 60s;
+                  
+                  # 缓冲区设置
+                  proxy_buffering on;
+                  proxy_buffer_size 4k;
+                  proxy_buffers 8 4k;
+              }
+              
+              # 健康检查端点
+              location /health {
+                  proxy_pass http://127.0.0.1:$BACKEND_PORT/health;
+                  access_log off;
+              }
+              
+              # Webhook端点（Line和Telegram要求快速响应）
+              location ~ ^/webhook/(line|telegram)$ {
+                  proxy_pass http://127.0.0.1:$BACKEND_PORT;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  
+                  # 快速响应设置
+                  proxy_connect_timeout 5s;
+                  proxy_send_timeout 10s;
+                  proxy_read_timeout 10s;
+                  proxy_buffering off;
+              }
+              
+              # 静态文件缓存
+              location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                  expires 1y;
+                  add_header Cache-Control "public, immutable";
+                  access_log off;
+              }
+              
+              # API文档路径
+              location /docs {
+                  proxy_pass http://127.0.0.1:$BACKEND_PORT/docs;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+              }
+              
+              # robots.txt
+              location = /robots.txt {
+                  return 200 "User-agent: *\nDisallow: /\n";
+                  add_header Content-Type text/plain;
+              }
+          }
+          EOF
+          
+          # 启用站点配置
+          echo "🔗 启用Nginx站点配置..."
+          if [ ! -L "/etc/nginx/sites-enabled/$DOMAIN" ]; then
+              sudo ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
+          fi
+          
+          # 删除默认Nginx站点（如果存在）
+          if [ -L "/etc/nginx/sites-enabled/default" ]; then
+              sudo rm -f /etc/nginx/sites-enabled/default
+          fi
+          
+          # 删除旧的服务配置（如果存在）
+          if [ -L "/etc/nginx/sites-enabled/$SERVICE_NAME" ] && [ "$SERVICE_NAME" != "$DOMAIN" ]; then
+              sudo rm -f /etc/nginx/sites-enabled/$SERVICE_NAME
+          fi
+          
+          # 测试Nginx配置
+          echo "🧪 测试Nginx配置..."
+          if sudo nginx -t; then
+              echo "✅ Nginx配置测试通过"
+          else
+              echo "❌ Nginx配置测试失败"
+              exit 1
+          fi
+          
+          # 重启Nginx
+          echo "🔄 重启Nginx服务..."
+          sudo systemctl restart nginx
+          sudo systemctl enable nginx
+          
+          # 检查Nginx状态
+          if systemctl is-active --quiet nginx; then
+              echo "✅ Nginx服务运行正常"
+          else
+              echo "❌ Nginx服务启动失败"
+              sudo systemctl status nginx --no-pager -l
+              exit 1
+          fi
+          
+          # 配置HTTPS（如果启用）
+          if [ "$ENABLE_HTTPS" = "true" ]; then
+              echo "🔐 配置HTTPS证书..."
+              
+              # 获取服务器IP
+              echo "🔍 获取服务器IP地址..."
+              SERVER_IP=""
+              
+              # 方法1: 使用ip命令获取主要网络接口的IPv4地址
+              if [ -z "$SERVER_IP" ]; then
+                  SERVER_IP=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' | head -1)
+              fi
+              
+              # 方法2: 使用hostname命令
+              if [ -z "$SERVER_IP" ]; then
+                  SERVER_IP=$(hostname -I | awk '{print $1}')
+              fi
+              
+              # 方法3: 使用外部服务获取公网IPv4
+              if [ -z "$SERVER_IP" ] || [[ "$SERVER_IP" =~ ^192\.168\. ]] || [[ "$SERVER_IP" =~ ^10\. ]] || [[ "$SERVER_IP" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
+                  PUBLIC_IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null || curl -s -4 ipecho.net/plain 2>/dev/null)
+                  if [ ! -z "$PUBLIC_IP" ] && [[ "$PUBLIC_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                      SERVER_IP="$PUBLIC_IP"
+                  fi
+              fi
+              
+              echo "服务器IP: $SERVER_IP"
+              
+              # 检查DNS记录
+              echo "🔍 检查DNS记录..."
+              DOMAIN_IP=$(dig +short $DOMAIN 2>/dev/null | head -n1 || echo "")
+              echo "域名解析IP: $DOMAIN_IP"
+              
+              if [ -n "$DOMAIN_IP" ] && [ "$SERVER_IP" = "$DOMAIN_IP" ]; then
+                  echo "✅ DNS记录正确，开始申请SSL证书..."
+                  
+                  # 测试HTTP连接
+                  echo "🧪 测试HTTP连接..."
+                  if curl -s -o /dev/null -w "%{http_code}" "http://$DOMAIN/health" | grep -q "200"; then
+                      echo "✅ HTTP连接测试通过"
+                  else
+                      echo "⚠️ HTTP连接测试失败，但继续申请证书"
+                  fi
+                  
+                  # 申请SSL证书
+                  echo "📜 申请SSL证书..."
+                  if sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email $EMAIL --redirect; then
+                      echo "✅ SSL证书配置成功！"
+                      
+                      # 验证HTTPS连接
+                      echo "🧪 验证HTTPS连接..."
+                      sleep 5
+                      if curl -s -o /dev/null -w "%{http_code}" "https://$DOMAIN/health" | grep -q "200"; then
+                          echo "✅ HTTPS连接验证成功"
+                      else
+                          echo "⚠️ HTTPS连接验证失败"
+                      fi
+                      
+                      # 测试证书自动续期
+                      echo "🧪 测试证书自动续期..."
+                      if sudo certbot renew --dry-run; then
+                          echo "✅ 证书自动续期测试通过"
+                      else
+                          echo "⚠️ 证书自动续期测试失败"
+                      fi
+                      
+                      # 设置证书自动续期
+                      echo "⏰ 设置证书自动续期..."
+                      if ! sudo crontab -l 2>/dev/null | grep -q certbot; then
+                          (sudo crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && /usr/bin/systemctl reload nginx") | sudo crontab -
+                          echo "✅ 已设置证书自动续期（每日12点检查）"
+                      else
+                          echo "✅ 证书自动续期已存在"
+                      fi
+                      
+                  else
+                      echo "❌ SSL证书申请失败"
+                      echo ""
+                      echo "🔧 故障排除指南："
+                      echo "1. 检查域名DNS记录是否正确指向服务器IP: $SERVER_IP"
+                      echo "2. 确保防火墙允许80和443端口"
+                      echo "3. 验证邮箱地址是否有效"
+                      echo "4. 检查域名是否已有其他SSL证书"
+                      echo "5. 等待几分钟后重试（DNS传播需要时间）"
+                      echo ""
+                      echo "📋 手动申请命令："
+                      echo "sudo certbot --nginx -d $DOMAIN --email $EMAIL"
+                      exit 1
+                  fi
+              else
+                  echo "❌ DNS记录不正确！"
+                  echo ""
+                  echo "🔧 请配置DNS记录："
+                  echo "类型: A"
+                  echo "名称: $DOMAIN"
+                  echo "值: $SERVER_IP"
+                  echo ""
+                  echo "⏱️ DNS记录配置后，请等待传播完成（通常5-30分钟）"
+                  echo "然后重新运行此workflow以申请SSL证书"
+                  echo ""
+                  echo "🧪 验证DNS命令："
+                  echo "dig +short $DOMAIN"
+                  echo "nslookup $DOMAIN"
+                  exit 1
+              fi
+          fi
+          
+          # 运行最终健康检查
+          echo "🏥 运行最终健康检查..."
+          sleep 3
+          
+          if [ "$ENABLE_HTTPS" = "true" ] && [ -d "/etc/letsencrypt/live/$DOMAIN" ]; then
+              HEALTH_URL="https://$DOMAIN/health"
+          else
+              HEALTH_URL="http://$DOMAIN/health"
+          fi
+          
+          HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
+          
+          if [ "$HEALTH_CHECK" = "200" ]; then
+              echo "✅ 健康检查通过"
+          else
+              echo "⚠️ 健康检查失败 (HTTP: $HEALTH_CHECK)"
+              echo "请检查后端服务是否在端口 $BACKEND_PORT 上运行"
+          fi
+          
+          echo ""
+          echo "🎉 Nginx配置完成！"
+          echo ""
+          
+          # 输出访问地址
+          if [ "$ENABLE_HTTPS" = "true" ] && [ -d "/etc/letsencrypt/live/$DOMAIN" ]; then
+              echo "🌐 服务地址:"
+              echo "   主页: https://$DOMAIN"
+              echo "   API文档: https://$DOMAIN/docs"
+              echo "   健康检查: https://$DOMAIN/health"
+              echo ""
+              echo "🔗 Webhook URLs:"
+              echo "   Line: https://$DOMAIN/webhook/line"
+              echo "   Telegram: https://$DOMAIN/webhook/telegram"
+              echo ""
+              echo "🔐 SSL证书信息:"
+              echo "   状态: 已启用"
+              echo "   自动续期: 已配置"
+          else
+              echo "🌐 服务地址:"
+              echo "   主页: http://$DOMAIN"
+              echo "   API文档: http://$DOMAIN/docs"
+              echo "   健康检查: http://$DOMAIN/health"
+              echo ""
+              echo "🔗 Webhook URLs:"
+              echo "   Line: http://$DOMAIN/webhook/line"
+              echo "   Telegram: http://$DOMAIN/webhook/telegram"
+          fi
+          
+          echo ""
+          echo "📋 Nginx管理命令:"
+          echo "   查看状态: sudo systemctl status nginx"
+          echo "   重启服务: sudo systemctl restart nginx"
+          echo "   重载配置: sudo systemctl reload nginx"
+          echo "   测试配置: sudo nginx -t"
+          
+          if [ "$ENABLE_HTTPS" = "true" ]; then
+              echo ""
+              echo "🔐 SSL证书管理:"
+              echo "   查看证书: sudo certbot certificates"
+              echo "   手动续期: sudo certbot renew"
+              echo "   测试续期: sudo certbot renew --dry-run"
+          fi
+          
+          echo ""
+          echo "⚠️ 下一步操作:"
+          echo "   1. 在Line开发者控制台设置webhook URL"
+          echo "   2. 在Telegram BotFather设置webhook URL"
+          echo "   3. 确保后端服务在端口 $BACKEND_PORT 上运行"
+          if [ "$ENABLE_HTTPS" != "true" ]; then
+              echo "   4. 建议启用HTTPS以提高安全性"
+          fi 
