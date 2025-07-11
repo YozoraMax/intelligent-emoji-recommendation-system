@@ -65,8 +65,22 @@ jobs:
           if ! command -v python3 &> /dev/null || ! python3 -m venv --help &> /dev/null; then
               echo "📦 安装Python依赖..."
               export DEBIAN_FRONTEND=noninteractive
-              sudo apt update -qq > /dev/null 2>&1
-              sudo apt install -y -qq python3 python3-pip python3-venv python3-dev > /dev/null 2>&1
+              
+              # 配置阿里云软件源镜像
+              echo "🔧 配置软件源镜像..."
+              sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null || true
+              
+              # 更新软件包列表
+              sudo apt update -qq > /dev/null 2>&1 || {
+                  echo "⚠️  官方源可能有问题，尝试使用阿里云镜像源..."
+                  # 如果官方源有问题，尝试使用阿里云镜像
+                  echo "deb https://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs) main restricted universe multiverse" | sudo tee /etc/apt/sources.list > /dev/null
+                  echo "deb https://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list > /dev/null
+                  echo "deb https://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list > /dev/null
+                  sudo apt update -qq > /dev/null 2>&1
+              }
+              
+              sudo apt install -y -qq python3 python3-pip python3-venv python3-dev build-essential > /dev/null 2>&1
           else
               echo "✅ Python环境已就绪"
           fi
@@ -115,6 +129,14 @@ jobs:
               fi
           fi
           
+          # 网络连接测试
+          echo "🌐 测试网络连接..."
+          if ping -c 1 mirrors.aliyun.com > /dev/null 2>&1; then
+              echo "✅ 阿里云镜像连接正常"
+          else
+              echo "⚠️  阿里云镜像连接异常，将尝试多个镜像源"
+          fi
+          
           # 智能虚拟环境处理
           echo "🐍 设置虚拟环境..."
           if [ ! -d "venv" ]; then
@@ -124,13 +146,55 @@ jobs:
           
           # 优化的依赖安装
           echo "📚 安装依赖（优化模式）..."
-          # 使用pip缓存和并行安装加速
-          pip install --upgrade pip --quiet
-          pip install --no-cache-dir -r requirements.txt --quiet
-          pip install gunicorn --quiet
+          # 配置阿里云PyPI镜像源，解决网络连接问题
+          mkdir -p ~/.pip
+          cat > ~/.pip/pip.conf <<EOF
+          [global]
+          index-url = https://mirrors.aliyun.com/pypi/simple/
+          trusted-host = mirrors.aliyun.com
+          timeout = 120
+          EOF
+          
+          # 使用阿里云镜像源升级pip
+          echo "🔄 升级pip..."
+          pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ --quiet || {
+              echo "❌ pip升级失败，尝试使用其他镜像源..."
+              pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple/ --quiet || {
+                  echo "⚠️  pip升级仍然失败，继续使用当前版本"
+              }
+          }
+          
+          # 安装项目依赖
+          echo "📦 安装项目依赖..."
+          pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --timeout 300 || {
+              echo "❌ 阿里云镜像安装失败，尝试清华大学镜像..."
+              pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/ --timeout 300 || {
+                  echo "❌ 清华镜像也失败，尝试中科大镜像..."
+                  pip install --no-cache-dir -r requirements.txt -i https://pypi.mirrors.ustc.edu.cn/simple/ --timeout 300 || {
+                      echo "❌ 所有镜像源都失败，尝试官方源..."
+                      pip install --no-cache-dir -r requirements.txt --timeout 300 || {
+                          echo "❌ 依赖安装完全失败，退出部署"
+                          exit 1
+                      }
+                  }
+              }
+          }
+          
+          # 安装Gunicorn
+          echo "🦄 安装Gunicorn..."
+          pip install gunicorn -i https://mirrors.aliyun.com/pypi/simple/ --quiet || {
+              echo "⚠️  使用备用镜像安装Gunicorn..."
+              pip install gunicorn -i https://pypi.tuna.tsinghua.edu.cn/simple/ --quiet
+          }
           
           # 创建日志目录
           mkdir -p logs
+          
+          # 验证依赖安装
+          echo "🔍 验证关键依赖..."
+          python -c "import fastapi; print('✅ FastAPI安装成功')" || echo "❌ FastAPI安装失败"
+          python -c "import oss2; print('✅ OSS2安装成功')" || echo "❌ OSS2安装失败"
+          python -c "import uvicorn; print('✅ Uvicorn安装成功')" || echo "❌ Uvicorn安装失败"
           
           # 创建systemd服务（仅在不存在时）
           if [ ! -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
@@ -181,9 +245,11 @@ jobs:
                   sudo journalctl -u $SERVICE_NAME --no-pager -l -n 10
                   echo ""
                   echo "🔍 可能的问题："
-                  echo "   1. OSS配置未正确设置"
-                  echo "   2. Python依赖安装失败"
-                  echo "   3. 端口8000被占用"
+                  echo "   1. OSS配置未正确设置 - 请检查config.py中的OSS配置"
+                  echo "   2. Python依赖安装失败 - 检查网络连接和镜像源"
+                  echo "   3. 端口8000被占用 - 运行: sudo netstat -tlnp | grep :8000"
+                  echo "   4. 防火墙阻止访问 - 运行: sudo ufw status"
+                  echo "   5. 内存不足 - 运行: free -h"
                   exit 1
               else
                   echo "⏳ 等待服务启动... ($i/5)"
