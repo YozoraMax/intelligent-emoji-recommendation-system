@@ -1,0 +1,61 @@
+{
+  "metadata": {
+    "generated_at": "2025-07-10T10:55:47.389466",
+    "total_categories": 9,
+    "total_files": 102,
+    "oss_bucket": "coze-archive",
+    "oss_endpoint": "oss-cn-beijing.aliyuncs.com",
+    "emoji_root_path": "sably/"
+  },
+  "categories": {
+    "好吃": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/好吃/好吃/1716434598861.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/好吃/好吃/1716434707976.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/好吃/好吃/2348750447.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/好吃/好吃/2348973595.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/好吃/好吃/2348973596.gif"
+    ],
+    "害羞": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/害羞/害羞/2302878817.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/害羞/害羞/2332398736.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/害羞/害羞/2372579622.gif"
+    ],
+    "开心 舒适": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/开心 舒适/开心 舒适/1732357420441.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/开心 舒适/开心 舒适/1732357436887.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/开心 舒适/开心 舒适/1732357472296.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/开心 舒适/开心 舒适/2283348939.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/开心 舒适/开心 舒适/2286928258.gif"
+    ],
+    "悲伤 丧丧的 焦虑 紧张": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/悲伤 丧丧的 焦虑 紧张/悲伤  丧丧的 焦虑 紧张/2283348936.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/悲伤 丧丧的 焦虑 紧张/悲伤  丧丧的 焦虑 紧张/2283348938.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/悲伤 丧丧的 焦虑 紧张/悲伤  丧丧的 焦虑 紧张/2283348943.gif"
+    ],
+    "愤怒 爆炸": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/愤怒 爆炸/愤怒  爆炸/1732357505466.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/愤怒 爆炸/愤怒  爆炸/2349922602.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/愤怒 爆炸/愤怒  爆炸/2372579634.gif"
+    ],
+    "撒娇 求关注": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/撒娇 求关注/撒娇  求关注/1732357299549.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/撒娇 求关注/撒娇  求关注/1732357321408.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/撒娇 求关注/撒娇  求关注/1732357523771.gif"
+    ],
+    "疲惫 累 倦怠 厌世 无语": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/疲惫 累 倦怠 厌世 无语/疲惫  累  倦怠，厌世  无语/1732357395047.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/疲惫 累 倦怠 厌世 无语/疲惫  累  倦怠，厌世  无语/2302878815.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/疲惫 累 倦怠 厌世 无语/疲惫  累  倦怠，厌世  无语/2349079627.gif"
+    ],
+    "赞同 支持": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/赞同 支持/赞同  支持/1742360830117.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/赞同 支持/赞同  支持/2349920944.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/赞同 支持/赞同  支持/2349920947.gif"
+    ],
+    "鼓励 安慰": [
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/鼓励 安慰/鼓励  安慰/2349079631.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/鼓励 安慰/鼓励  安慰/2349081110.gif",
+      "https://coze-archive.oss-cn-beijing.aliyuncs.com/sably/鼓励 安慰/鼓励  安慰/2349923362.gif"
+    ]
+  }
+}
