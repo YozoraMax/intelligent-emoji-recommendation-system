@@ -129,3 +129,7 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+# Production deployment
+gunicorn.pid
+*.sock

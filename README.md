@@ -31,13 +31,26 @@ intelligent-emoji-recommendation-system/
 - Python 3.8+
 - 阿里云OSS访问权限
 
-### 2. 安装依赖
+### 2. 创建虚拟环境（推荐）
+
+```bash
+# 创建虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+# Linux/macOS:
+source venv/bin/activate
+# Windows:
+# venv\Scripts\activate
+```
+
+### 3. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. 配置OSS
+### 4. 配置OSS
 
 在 `config.py` 中配置OSS相关参数：
 
@@ -57,7 +70,7 @@ class OSSConfig:
     # ACCESS_KEY_SECRET = 'your-access-key-secret'
 ```
 
-### 4. 环境变量配置（可选）
+### 5. 环境变量配置（可选）
 
 创建 `.env` 文件：
 
@@ -82,7 +95,7 @@ export API_USERNAME="your-username"
 export API_PASSWORD="your-password"
 ```
 
-### 5. 运行服务
+### 6. 运行服务
 
 ```bash
 python oss_api_server.py
@@ -364,47 +377,86 @@ python config.py
 
 ## 📦 部署指南
 
-### Docker部署
-
-#### 方式1: 使用预配置的Dockerfile
-
-```bash
-# 构建镜像
-docker build -t emoji-recommender .
-
-# 运行容器
-docker run -p 8000:8000 \
-  -e OSS_ACCESS_KEY_ID="your-key" \
-  -e OSS_ACCESS_KEY_SECRET="your-secret" \
-  -e API_USERNAME="admin" \
-  -e API_PASSWORD="secure-password" \
-  emoji-recommender
-```
-
-#### 方式2: 使用docker-compose
-
-```bash
-# 复制环境变量文件
-cp .env.example .env
-# 编辑 .env 文件，填入你的配置
-
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-```
-
 ### 生产环境部署
 
-推荐使用Gunicorn：
+#### 使用Gunicorn（推荐）
 
 ```bash
+# 安装Gunicorn
 pip install gunicorn
+
+# 启动服务（4个工作进程）
 gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 oss_api_server:app
+
+# 带日志配置的启动
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8000 \
+  --access-logfile /var/log/emoji-api/access.log \
+  --error-logfile /var/log/emoji-api/error.log \
+  --log-level info \
+  oss_api_server:app
+```
+
+#### 使用systemd服务（Linux）
+
+创建服务配置文件 `/etc/systemd/system/emoji-recommender.service`：
+
+```ini
+[Unit]
+Description=Emoji Recommender API Service
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/intelligent-emoji-recommendation-system
+Environment="PATH=/path/to/venv/bin"
+ExecStart=/path/to/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 oss_api_server:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+启动服务：
+
+```bash
+# 重新加载systemd配置
+sudo systemctl daemon-reload
+
+# 启动服务
+sudo systemctl start emoji-recommender
+
+# 设置开机自启
+sudo systemctl enable emoji-recommender
+
+# 查看服务状态
+sudo systemctl status emoji-recommender
+```
+
+#### 使用Nginx反向代理
+
+Nginx配置示例：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 超时配置
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
 ```
 
 ## 🔍 故障排除
@@ -429,6 +481,8 @@ gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 oss_api_server:ap
    - 增加缓存时间（CACHE_EXPIRE_HOURS）
    - 使用CDN加速OSS访问
    - 考虑本地缓存表情包URL
+   - 使用Gunicorn多进程部署
+   - 配置Nginx反向代理和负载均衡
 
 ### 日志查看
 
